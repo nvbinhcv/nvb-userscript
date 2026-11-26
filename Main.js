@@ -95,11 +95,33 @@
             setValue(login.password, credentials.password);
             sessionStorage.setItem(guard, 'submitted');
             await wait(250);
-            const submitCandidates = [...login.form.querySelectorAll('button[type="submit"],input[type="submit"],button')].filter(el => visible(el) && !el.disabled);
-            const submit = submitCandidates.find(el => el.matches('button[type="submit"],input[type="submit"]')) || submitCandidates.find(el => /dang nhap|đăng nhập|login|sign in/i.test(el.textContent || el.value || '')) || submitCandidates[0];
-            if (submit) submit.click();
-            else if (login.form.requestSubmit) login.form.requestSubmit();
-            else login.form.submit();
+            // Chỉ chọn nút đăng nhập bằng tài khoản/mật khẩu; tuyệt đối bỏ qua nút OAuth/Google.
+            const submitCandidates = [...login.form.querySelectorAll('button,input[type="submit"],[role="button"]')]
+                .filter(el => visible(el) && !el.disabled);
+            const buttonLabel = el => [
+                el.textContent, el.value, el.getAttribute('aria-label'),
+                el.getAttribute('title'), el.getAttribute('name'),
+                el.getAttribute('data-provider'), el.getAttribute('data-action')
+            ].filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim();
+            const isSocialLogin = el => /google|oauth|facebook|apple|social|zalo/i.test(buttonLabel(el));
+            const accountLoginButton = submitCandidates.find(el =>
+                !isSocialLogin(el) &&
+                /^(đăng nhập|dang nhap|login|sign in)(?:\\s|$)/i.test(buttonLabel(el))
+            ) || submitCandidates.find(el =>
+                !isSocialLogin(el) &&
+                /đăng nhập|dang nhap|login|sign in/i.test(buttonLabel(el))
+            );
+            if (accountLoginButton) {
+                accountLoginButton.click();
+            } else if (login.form instanceof HTMLFormElement) {
+                // Không click nút submit mặc định vì nút đầu tiên có thể là Đăng nhập Google.
+                // Submit trực tiếp form để tránh kích hoạt luồng OAuth.
+                HTMLFormElement.prototype.submit.call(login.form);
+            } else {
+                console.warn('[HH3D Manager] Không tìm thấy nút đăng nhập tài khoản; bỏ qua để tránh bấm nhầm Google.');
+                sessionStorage.removeItem(guard);
+                return;
+            }
             // Chờ form biến mất/được chuyển trang để tác vụ khởi tạo không chạy quá sớm.
             for (let i = 0; i < 40; i++) {
                 await wait(500);

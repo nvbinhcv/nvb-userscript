@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.27
+// @name          HH3D Auto - v2.4.28
 // @namespace     hh3d-tool
-// @version       2.4.27
+// @version       2.4.28
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -30,86 +30,6 @@
 // ==/UserScript==
 (async function () {
     'use strict';
-
-    // Tự đăng nhập bằng thông tin được Manager lưu mã hóa theo từng profile.
-    // Chỉ yêu cầu credentials cho các trang được mở kèm hh3d_manager_account.
-    const managerAutoLogin = async () => {
-        try {
-            const params = new URLSearchParams(location.search);
-            const accountKey = params.get('hh3d_manager_account') || localStorage.getItem('hh3d_manager_account_key') || '';
-            if (!accountKey) return;
-            localStorage.setItem('hh3d_manager_account_key', accountKey);
-            const guard = `hh3d_auto_login_${location.hostname}_${accountKey}`;
-            if (sessionStorage.getItem(guard) === 'submitted') return;
-            const loggedOutLink = [...document.querySelectorAll('a[href]')].find(a => /dang-xuat|logout|log-out/i.test((a.getAttribute('href') || '') + ' ' + (a.textContent || '')) && (a.offsetWidth || a.offsetHeight || a.getClientRects().length));
-            if (loggedOutLink) return;
-            const credentials = await new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: 'http://127.0.0.1:18765/login-credentials?token=HH3D-LOCAL-STATUS-ONLY-2026&account_key=' + encodeURIComponent(accountKey),
-                    timeout: 5000,
-                    onload: response => {
-                        try { if (response.status === 200) resolve(JSON.parse(response.responseText)); else reject(new Error('Manager không trả thông tin đăng nhập')); }
-                        catch (e) { reject(e); }
-                    },
-                    onerror: () => reject(new Error('Không kết nối được Manager localhost')),
-                    ontimeout: () => reject(new Error('Hết thời gian lấy thông tin đăng nhập'))
-                });
-            });
-            if (!credentials?.username || !credentials?.password) return;
-            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-            const visible = el => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
-            const findLoginForm = () => {
-                const passwords = [...document.querySelectorAll('input[type="password"]')].filter(visible);
-                for (const password of passwords) {
-                    const form = password.form || password.closest('form') || password.parentElement?.closest('form') || document;
-                    const candidates = [...form.querySelectorAll('input:not([type="password"]),input[type="email"]')].filter(el => {
-                        if (!visible(el) || el.disabled || el.type === 'hidden') return false;
-                        const hint = `${el.name || ''} ${el.id || ''} ${el.placeholder || ''} ${el.autocomplete || ''}`.toLowerCase();
-                        return /user|email|login|account|phone|tai.?khoan|ten.?dang.?nhap/.test(hint) || ['text','email','tel'].includes((el.type || '').toLowerCase());
-                    });
-                    const username = candidates.find(el => /user|email|login|account|tai.?khoan|ten.?dang.?nhap/.test(`${el.name} ${el.id} ${el.placeholder}`.toLowerCase())) || candidates[0];
-                    if (username) return {form, username, password};
-                }
-                return null;
-            };
-            let login = null;
-            for (let i = 0; i < 30 && !login; i++) { login = findLoginForm(); if (!login) await wait(500); }
-            if (!login) {
-                const loginLink = [...document.querySelectorAll('a[href]')].find(a => /dang-nhap|login|sign-in/i.test(a.getAttribute('href') || '') && visible(a));
-                if (loginLink && !/dang-nhap|login|sign-in/i.test(location.pathname)) {
-                    sessionStorage.setItem(guard, 'navigating');
-                    location.href = loginLink.href;
-                    return;
-                }
-                return;
-            }
-            const setValue = (el, value) => {
-                const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : Object.getPrototypeOf(el);
-                const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-                if (setter) setter.call(el, value); else el.value = value;
-                el.dispatchEvent(new Event('input', {bubbles:true}));
-                el.dispatchEvent(new Event('change', {bubbles:true}));
-            };
-            setValue(login.username, credentials.username);
-            setValue(login.password, credentials.password);
-            sessionStorage.setItem(guard, 'submitted');
-            await wait(250);
-            const submitCandidates = [...login.form.querySelectorAll('button[type="submit"],input[type="submit"],button')].filter(el => visible(el) && !el.disabled);
-            const submit = submitCandidates.find(el => el.matches('button[type="submit"],input[type="submit"]')) || submitCandidates.find(el => /dang nhap|đăng nhập|login|sign in/i.test(el.textContent || el.value || '')) || submitCandidates[0];
-            if (submit) submit.click();
-            else if (login.form.requestSubmit) login.form.requestSubmit();
-            else login.form.submit();
-            // Chờ form biến mất/được chuyển trang để tác vụ khởi tạo không chạy quá sớm.
-            for (let i = 0; i < 40; i++) {
-                await wait(500);
-                if (!document.contains(login.password) || !visible(login.password)) break;
-            }
-        } catch (error) {
-            console.warn('[HH3D Manager] Tự đăng nhập chưa thực hiện được:', error?.message || error);
-        }
-    };
-    await managerAutoLogin();
 
     // Bridge page-context: WP được website khai báo bằng global lexical `const WP`,
     // nên unsafeWindow.WP có thể không đọc được từ sandbox của Tampermonkey.
@@ -1077,8 +997,7 @@
                     // Cách 2: Fallback nếu không có unsafeWindow
                     else if (typeof window.hh3dData !== 'undefined') {
                         window.hh3dData.securityToken = token;
-                        console.log(`${logPrefix} ⚠️ Đã cập nhật hh3dData qua window thường.`);
-                    }
+                        console.log(`${logPrefix} ⚠️ Đã cập nhật hh3dData qua window thường.`);                    }
 
                     // Cách 3: "Tiêm thuốc" trực tiếp
                     try {
@@ -2077,8 +1996,7 @@
                     guideBtn.addEventListener('click', () => {
                         showGuideModal();
                     });
-                }
-            }, 100);
+                }            }, 100);
         } catch (e) {
             console.error("Error fetching Xu:", e);
         }
@@ -2829,6 +2747,7 @@
             case 'khoangmach': {
                 const _savedRewardMode = localStorage.getItem('khoangmach_reward_mode') || 'any';
                 const _savedRewardTime = localStorage.getItem('khoangmach_reward_time') || 'max';
+                const _savedDailyTuViMode = localStorage.getItem('khoangmach_daily_tuvi_mode') || '100';
                 return `
                 <div class="settings-section">
                     <h3>Cài đặt Khoáng Mạch</h3>
@@ -2859,6 +2778,14 @@
                             <option value="10" ${_savedRewardTime === '10' ? 'selected' : ''}>10 phút</option>
                             <option value="4" ${_savedRewardTime === '4' ? 'selected' : ''}>4 phút</option>
                             <option value="2" ${_savedRewardTime === '2' ? 'selected' : ''}>2 phút</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-option">
+                        <label for="khoangmach-daily-tuvi-mode">Cách nhận thưởng:</label>
+                        <select id="khoangmach-daily-tuvi-mode" class="settings-select">
+                            <option value="100" ${_savedDailyTuViMode === '100' ? 'selected' : ''}>Nhận full (100%)</option>
+                            <option value="90" ${_savedDailyTuViMode === '90' ? 'selected' : ''}>Nhận 90% Tu Vi/ngày</option>
                         </select>
                     </div>
 
@@ -3068,8 +2995,7 @@
                 const buyBundle = localStorage.getItem('muaLinhDuoc_buyBundle') !== 'false'; // mặc định true
                 const buyKim = localStorage.getItem('muaLinhDuoc_buyKim') !== 'false'; // mặc định true
                 const buyMoc = localStorage.getItem('muaLinhDuoc_buyMoc') === 'true'; // mặc định false
-                const buyThuy = localStorage.getItem('muaLinhDuoc_buyThuy') === 'true'; // mặc định false
-                const buyHoa = localStorage.getItem('muaLinhDuoc_buyHoa') !== 'false'; // mặc định true
+                const buyThuy = localStorage.getItem('muaLinhDuoc_buyThuy') === 'true'; // mặc định false                const buyHoa = localStorage.getItem('muaLinhDuoc_buyHoa') !== 'false'; // mặc định true
                 const buyTho = localStorage.getItem('muaLinhDuoc_buyTho') === 'true'; // mặc định false
                 return `
                 <div class="settings-section">
@@ -3354,6 +3280,7 @@
             'khoangmach_outer_notification',
             'khoangmach_reward_mode',
             'khoangmach_reward_time',
+            'khoangmach_daily_tuvi_mode',
             'khoangmach_check_interval',
             'luyenDanMinStars',
             'luyenDanTargetTier',
@@ -3554,6 +3481,7 @@
                     const km_leaveMine = document.getElementById('khoangmach-leave-mine')?.checked || false;
                     const km_rewardMode = document.getElementById('khoangmach-reward-mode')?.value || 'any';
                     const km_rewardTime = document.getElementById('khoangmach-reward-time')?.value || 'max';
+                    const km_dailyTuViMode = document.getElementById('khoangmach-daily-tuvi-mode')?.value || '100';
                     const km_checkInterval = parseInt(document.getElementById('khoangmach-check-interval')?.value || '5', 10);
 
                     // Lưu mỏ đã chọn (data-mine chứa JSON {id, type})
@@ -3571,6 +3499,7 @@
                     localStorage.setItem(`khoangmach_leave_mine_to_claim_reward_${accountId}`, String(km_leaveMine));
                     localStorage.setItem('khoangmach_reward_mode', km_rewardMode);
                     localStorage.setItem('khoangmach_reward_time', km_rewardTime);
+                    localStorage.setItem('khoangmach_daily_tuvi_mode', km_dailyTuViMode);
                     localStorage.setItem('khoangmach_check_interval', isNaN(km_checkInterval) || km_checkInterval < 1 ? '5' : String(km_checkInterval));
                     saved = true;
                     break;
@@ -3750,8 +3679,7 @@
             if (!this.questionDataCache || !this.questionDataCache.questions) return;
             const builtinAnswers = {
                 'Man Hồ Tử trong phim "Phàm Nhân Tu Tiên" tu luyện công pháp nào?': 'Thác Thiên Ma Công',
-                'Lâm Thất Dạ là nhân vật trong bộ phim hoạt hình trung quốc nào sau đây ?': 'Trảm Thần',
-                'Lâm Thất Dạ là nhân vật trong bộ hoạt hình trung quốc nào sau đây ?': 'Trảm Thần'
+                'Lâm Thất Dạ là nhân vật trong bộ phim hoạt hình trung quốc nào sau đây ?': 'Trảm thần'
             };
             Object.assign(this.questionDataCache.questions, builtinAnswers);
         }
@@ -4066,8 +3994,7 @@
                 );
 
             } catch (e) {
-                console.error(`[HH3D Vấn Đáp] ❌ Lỗi xảy ra:`, e);
-                showNotification(`Lỗi khi thực hiện Vấn Đáp: ${e.message}`, 'error');
+                console.error(`[HH3D Vấn Đáp] ❌ Lỗi xảy ra:`, e);                showNotification(`Lỗi khi thực hiện Vấn Đáp: ${e.message}`, 'error');
             }
         }
     }
@@ -5067,7 +4994,6 @@
                     checkedAt: Date.now()
                 };
             }
-
             // Cập nhật % HP boss lên UI quest item Bí Cảnh
             if (statusResp?.boss?.hp_percentage != null) {
                 window.bicanhBossHp = Number(statusResp.boss.hp_percentage);
@@ -6066,8 +5992,7 @@
             } else {
                 const payloadBossInfo = new URLSearchParams({
                     action: this.getHoangVucAction('bossGet', 'get_boss'),
-                    nonce
-                });
+                    nonce                });
                 const bossInfoResponse = await fetch(this.ajaxUrl, {
                     method: 'POST', headers: this.headers, body: payloadBossInfo,
                     credentials: 'include', cache: 'no-store'
@@ -7066,8 +6991,7 @@
                             this.updateProgress("Mở gói linh dược");
                             const openRes = await this.sendLdRequest("/open-mat-bundle", "POST", { job_id: String(bundleKey), bundle_key: String(bundleKey) });
                             if (openRes && !openRes.error) {
-                                showNotification(`🧪 ✅ Mở gói linh dược thành công!`, "success");
-                                return 3000;
+                                showNotification(`🧪 ✅ Mở gói linh dược thành công!`, "success");                                return 3000;
                             } else {
                                 showNotification(`🧪 ❌ Mở gói linh dược thất bại: ${openRes?.message || 'lỗi'}`, "error");
                                 return 10000;
@@ -7567,6 +7491,36 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        // Đọc tiến độ Tu Vi/ngày trực tiếp từ trang Nhiệm Vụ Hằng Ngày.
+        // Trả về null nếu không đọc được để chế độ 90% không nhận thưởng khi thiếu dữ liệu.
+        async getDailyTuViProgress() {
+            try {
+                const url = new URL('nhiem-vu-hang-ngay', weburl).toString();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const pageText = (doc.body?.innerText || doc.body?.textContent || html)
+                    .replace(/\s+/g, ' ');
+                const match = pageText.match(/Tu\s*Vi\s*[:：]?\s*(\d[\d,.]*)\s*\/\s*(\d[\d,.]*)/i);
+                if (!match) throw new Error('Không tìm thấy chỉ số Tu Vi/ngày dạng hiện tại/tối đa');
+                const current = Number(match[1].replace(/[,.]/g, ''));
+                const limit = Number(match[2].replace(/[,.]/g, ''));
+                if (!Number.isFinite(current) || !Number.isFinite(limit) || limit <= 0) {
+                    throw new Error('Dữ liệu Tu Vi/ngày không hợp lệ');
+                }
+                return { current, limit };
+            } catch (error) {
+                console.warn(`${this.logPrefix} Không đọc được Tu Vi/ngày:`, error);
+                return null;
+            }
+        }
+
         async #getNonce(actionName) {
             return getSecurityNonce(this.khoangMachUrl, actionName);
         }
@@ -8036,15 +7990,15 @@
 
             const selectedMineInfo = JSON.parse(selectedMineSetting);
             if (!selectedMineInfo || !selectedMineInfo.id || !selectedMineInfo.type) {
-                showNotification('Cài đặt mỏ không hợp lệ.', 'error');
-                throw new Error('Cài đặt mỏ không hợp lệ.');
+                showNotification('Cài đặt mỏ không hợp lệ.', 'error');                throw new Error('Cài đặt mỏ không hợp lệ.');
             }
 
             const useBuff = localStorage.getItem('khoangmach_use_buff') === 'true';
             const autoTakeover = localStorage.getItem('khoangmach_auto_takeover') === 'true';
             const autoTakeoverRotation = localStorage.getItem('khoangmach_auto_takeover_rotation') === 'true';
             const rewardMode = localStorage.getItem('khoangmach_reward_mode') || 'any';
-            const rewardTimeSelected = localStorage.getItem('khoangmach_reward_time');
+            const rewardTimeSelected = localStorage.getItem('khoangmach_reward_time') || 'max';
+            const dailyTuViMode = localStorage.getItem('khoangmach_daily_tuvi_mode') || '100';
             const rewardTime = rewardTimeSelected;
             const outerNotification = localStorage.getItem('khoangmach_outer_notification') === 'true';
 
@@ -8152,6 +8106,38 @@
                     canClaim = true;
                 } else if (rewardMode === "110" && bonus === 110) {
                     canClaim = true;
+                }
+
+                if (canClaim && dailyTuViMode === '90') {
+                    const dailyProgress = await this.getDailyTuViProgress();
+                    if (!dailyProgress) {
+                        showNotification('[Khoáng mạch] Không đọc được Tu Vi/ngày. Tạm thời KHÔNG nhận thưởng và tiếp tục ở mỏ để tránh vượt ngưỡng 90%.', 'warn');
+                        console.warn(`${this.logPrefix} Bỏ qua nhận thưởng vì không có dữ liệu Tu Vi/ngày.`);
+                        break;
+                    }
+
+                    // Tính theo thời gian thực tế đang tích lũy trong mỏ; nếu đã bỏ qua lượt nhận trước,
+                    // thời gian tiếp tục tăng thì lượng Tu Vi dự kiến cũng phải tăng theo.
+                    const spentMatchForReward = String(myInfo.time_spent || '').match(/(\d+)\s*phút/i);
+                    const rewardMinutes = myInfo.time_spent === 'Đạt tối đa'
+                        ? 30
+                        : Math.max(1, spentMatchForReward ? parseInt(spentMatchForReward[1], 10) : (parseInt(rewardTimeSelected, 10) || 1));
+                    const tuViPerMinute = selectedMineInfo.type === 'gold' ? 6
+                        : (selectedMineInfo.type === 'silver' || selectedMineInfo.type === 'copper') ? 3 : null;
+                    if (tuViPerMinute === null) {
+                        showNotification('[Khoáng mạch] Không xác định được loại mỏ để tính Tu Vi. Tạm thời không nhận thưởng.', 'warn');
+                        break;
+                    }
+                    const expectedTuVi = tuViPerMinute * rewardMinutes;
+                    const threshold = dailyProgress.limit * 0.9;
+                    const afterClaim = dailyProgress.current + expectedTuVi;
+
+                    console.log(`${this.logPrefix} Tu Vi/ngày: ${dailyProgress.current}/${dailyProgress.limit}; dự kiến +${expectedTuVi}; sau nhận ${afterClaim}; ngưỡng 90%: ${threshold}.`);
+                    if (afterClaim > threshold) {
+                        showNotification(`[Khoáng mạch] Chưa nhận thưởng để giữ giới hạn 90% Tu Vi/ngày.<br>Hiện tại: <b>${dailyProgress.current}/${dailyProgress.limit}</b><br>Dự kiến nhận: <b>+${expectedTuVi} Tu Vi</b><br>Sau nhận: <b>${afterClaim}</b> / Ngưỡng: <b>${threshold}</b><br>Tool tiếp tục ở lại mỏ, không rời mỏ và không gọi API nhận thưởng.`, 'warn');
+                        break;
+                    }
+                    console.log(`${this.logPrefix} Đủ điều kiện ngưỡng 90% (${afterClaim} <= ${threshold}), cho phép nhận.`);
                 }
 
                 if (canClaim) {
@@ -9003,8 +8989,7 @@
                 }
 
                 // ⏳ Chờ 1 giây tránh spam
-                await new Promise(r => setTimeout(r, 1000));
-            } while (remainingSpins > 0);
+                await new Promise(r => setTimeout(r, 1000));            } while (remainingSpins > 0);
         }
 
         extractPtTokenFromHtml(html) {
@@ -10003,8 +9988,7 @@
             // background-color: #FF8C00;
             background-color: #7B68EE;
             color: #fff;
-            font-weight: bold;
-        }
+            font-weight: bold;        }
         .custom-script-khac-tran-van-vip-btn:hover {
             background-color: #6A5ACD;}
 
@@ -11003,8 +10987,7 @@
 
                 .settings-modal-header h2 {
                     margin: 0;
-                    color: #fff;
-                    font-size: 15px;
+                    color: #fff;                    font-size: 15px;
                     font-weight: 600;
                 }
 
@@ -12003,8 +11986,7 @@
         }
 
         async scheduleDoThach() {
-            const isEnabled = localStorage.getItem('autoDoThach') !== '0';
-            if (!isEnabled) {
+            const isEnabled = localStorage.getItem('autoDoThach') !== '0';            if (!isEnabled) {
                 if (this.dothachTimeout) {
                     clearTimeout(this.dothachTimeout);
                     this.dothachTimeout = null;
@@ -13004,7 +12986,6 @@
                 return;
             }
             if (action !== 'enter_mine') throw new Error(`Lệnh không được hỗ trợ: ${action}`);
-
             const mineId = String(params.get('hh3d_group_mine_id') || '');
             const mineType = String(params.get('hh3d_group_mine_type') || '');
             if (!mineId || !['gold', 'silver', 'copper'].includes(mineType)) throw new Error('Cấu hình mỏ không hợp lệ.');

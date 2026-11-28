@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.32
+// @name          HH3D Auto - v2.4.33
 // @namespace     hh3d-tool
-// @version       2.4.32
+// @version       2.4.33
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5564,6 +5564,8 @@
                 adminAjaxUrl: this.hvString(hv2?.adminAjax) || this.hvLiteral(currentBossText, ['adminAjaxUrl']),
                 serverTimeMs: Number(hv2?.serverMs) > 0 ? Number(hv2.serverMs) : this.hvNumberLiteral(currentBossText, ['serverTimeMs', 'server_time_ms']),
                 remainingAttacks: Number.isInteger(hv2Attacks) ? hv2Attacks : (count ? Number(count[0]) : null),
+                // Nhận diện trạng thái boss bị phong ấn từ nội dung trang do máy chủ trả về.
+                bossSealed: /(?:boss|thủ lĩnh)[^.!?]{0,80}(?:bị\s*)?phong\s*ấn|(?:bị\s*)?phong\s*ấn[^.!?]{0,80}(?:boss|thủ lĩnh)/i.test(doc.body?.textContent || ''),
                 myElement: this.hvString(hv2?.user?.element) || (element ? element[1].toLowerCase() : null),
                 loadedAt: Date.now()
             };
@@ -5866,7 +5868,8 @@
                                 const remaining = this.hvUpdateAttackResult(data);
                                 const done = Number.isInteger(remaining) ? (5 - remaining) : '?';
                                 showNotification(`✅ Gây ${data.damage} sát thương. Số lượt: ${done}/5`, 'success');
-                                if (remaining === 0) taskTracker.markTaskDone(accountId, 'hoangvuc');
+                                // Không tự đánh dấu xong ở đây: doHoangVucOnce sẽ tải lại trạng thái boss,
+                                // kiểm tra thưởng/boss phong ấn và chỉ dừng khi hết lượt thật sự.
                                 return true;
                             }
                             if (attempt === 0 && this.hvAuthRejected(result)) {
@@ -5956,6 +5959,16 @@
             const remainingAttacks = context.remainingAttacks;
             const nonce = context.nonce;
 
+            // Boss bị phong ấn: dừng Hoang Vực trong ngày, không gọi API đánh boss.
+            if (context.bossSealed || context.hv2?.boss?.sealed === true || context.hv2?.boss?.status === 'sealed') {
+                console.log(`${this.logPrefix} 🔒 Boss đang bị phong ấn. Dừng Hoang Vực hôm nay, không tấn công.`);
+                taskTracker.markTaskDone(accountId, 'hoangvuc');
+                return true;
+            }
+            if (!Number.isInteger(remainingAttacks) || remainingAttacks < 0) {
+                throw new Error('Hoang Vực: không đọc được số lượt đánh từ trang; tạm dừng, không tự đánh.');
+            }
+
             let boss;
             if (context.hv2 && context.boss && context.boss.id != null) {
                 boss = {
@@ -6044,11 +6057,9 @@
                 if (await this.attackHoangVucBoss(boss.id, nonce)) {
                     const latestRemaining = this._hvContext?.remainingAttacks;
                     if (latestRemaining === 0 || (!Number.isInteger(latestRemaining) && remainingAttacks <= 1)) {
-                        // Lượt cuối: nhận thưởng ngay, không tự đánh dấu xong chỉ vì 0/5.
-                        const claimed = await this.claimHoangVucRewards(nonce);
-                        if (!claimed) {
-                            throw new Error('Hoang Vực: lượt cuối đã dùng nhưng nhận thưởng chưa được xác nhận. Nhiệm vụ chưa được đánh dấu hoàn thành.');
-                        }
+                        // Hết lượt chỉ dừng đánh trong ngày. Không nhận thưởng chỉ vì số lượt về 0;
+                        // phần thưởng chỉ được nhận khi lần kiểm tra trạng thái xác nhận boss đã chết.
+                        console.log(`${this.logPrefix} ⏸️ Đã dùng hết lượt đánh hôm nay. Sẽ kiểm tra trạng thái boss ở lần chạy kế tiếp.`);
                         taskTracker.markTaskDone(accountId, 'hoangvuc');
                         return true;
                     }

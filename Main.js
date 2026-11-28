@@ -4925,7 +4925,7 @@
                 cache: "no-store"
             });
             const pageHtml = await pageResp.text();
-            const configMatch = pageHtml.match(/window\\.plConfig\\s*=\\s*(\\{[\\s\\S]*?\\});/);
+            const configMatch = pageHtml.match(/window\.plConfig\s*=\s*(\{[\s\S]*?\});/);
             if (configMatch?.[1]) {
                 const plConfig = JSON.parse(configMatch[1]);
                 pendingMilestones = Array.isArray(plConfig.pending) ? plConfig.pending : [];

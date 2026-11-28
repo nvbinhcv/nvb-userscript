@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.28
+// @name          HH3D Auto - v2.4.29
 // @namespace     hh3d-tool
-// @version       2.4.28
+// @version       2.4.29
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -6001,6 +6001,12 @@
                 return true;
             }
             if (remainingAttacks === 0) {
+                // 0 lượt đánh không đồng nghĩa nhiệm vụ đã hoàn thành.
+                // Thử nhận rương trước; chỉ đánh dấu xanh khi server xác nhận đã nhận.
+                const claimed = await this.claimHoangVucRewards(nonce);
+                if (!claimed) {
+                    throw new Error('Hoang Vực: đã hết lượt đánh nhưng chưa xác nhận nhận thưởng. Không đánh dấu nhiệm vụ hoàn thành.');
+                }
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }
@@ -6024,6 +6030,11 @@
                 if (await this.attackHoangVucBoss(boss.id, nonce)) {
                     const latestRemaining = this._hvContext?.remainingAttacks;
                     if (latestRemaining === 0 || (!Number.isInteger(latestRemaining) && remainingAttacks <= 1)) {
+                        // Lượt cuối: nhận thưởng ngay, không tự đánh dấu xong chỉ vì 0/5.
+                        const claimed = await this.claimHoangVucRewards(nonce);
+                        if (!claimed) {
+                            throw new Error('Hoang Vực: lượt cuối đã dùng nhưng nhận thưởng chưa được xác nhận. Nhiệm vụ chưa được đánh dấu hoàn thành.');
+                        }
                         taskTracker.markTaskDone(accountId, 'hoangvuc');
                         return true;
                     }

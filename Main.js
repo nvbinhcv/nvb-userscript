@@ -5985,10 +5985,23 @@
             // HV2 không trả has_pending_rewards như API cũ. Khi boss đã chết,
             // vẫn phải gọi claim_chest giống thao tác nhận thưởng thủ công trên website.
             if (context.hv2 && bossDefeated) {
+                const oldBossId = boss.id;
                 const claimed = await this.claimHoangVucRewards(nonce);
                 if (!claimed) {
                     throw new Error('Hoang Vực: boss đã chết nhưng máy chủ chưa xác nhận nhận thưởng. Đã dừng để tránh gửi lặp.');
                 }
+                // Sau khi nhận thưởng, hỏi lại máy chủ. Nếu đã sang ngày và boss mới mở,
+                // tiếp tục đánh ngay; nếu boss vẫn chết/bị phong ấn thì chờ ngày tiếp theo.
+                this._hvContext = null;
+                const refreshed = await this.getHoangVucData(weburl + 'hoang-vuc', true);
+                const refreshedBoss = refreshed.hv2?.boss || refreshed.boss;
+                const refreshedBossAlive = refreshedBoss && refreshedBoss.id != null && Number(refreshedBoss.health) > 0;
+                if (refreshedBossAlive) {
+                    console.log(`${this.logPrefix} 🐉 Đã nhận thưởng; máy chủ đang có boss ${refreshedBoss.id} (boss trước: ${oldBossId}). Tiếp tục tự đánh.`);
+                    taskTracker.unmarkTaskDone(accountId, 'hoangvuc');
+                    return this.doHoangVucOnce(true);
+                }
+                console.log(`${this.logPrefix} 🔒 Đã nhận thưởng; boss mới vẫn chưa mở, chờ ngày tiếp theo.`);
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }
@@ -6006,12 +6019,9 @@
                 return true;
             }
             if (remainingAttacks === 0) {
-                // 0 lượt đánh không đồng nghĩa nhiệm vụ đã hoàn thành.
-                // Thử nhận rương trước; chỉ đánh dấu xanh khi server xác nhận đã nhận.
-                const claimed = await this.claimHoangVucRewards(nonce);
-                if (!claimed) {
-                    throw new Error('Hoang Vực: đã hết lượt đánh nhưng chưa xác nhận nhận thưởng. Không đánh dấu nhiệm vụ hoàn thành.');
-                }
+                // Hết lượt khi boss còn sống không phải điều kiện nhận thưởng.
+                // Phần thưởng chỉ được nhận ở nhánh boss đã chết.
+                console.log(`${this.logPrefix} ⏸️ Đã hết 5 lượt đánh nhưng boss vẫn còn sống; không gọi nhận thưởng.`);
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }
@@ -11852,9 +11862,22 @@
             } else {
                 isTaskDone = taskTracker.isTaskDone(this.accountId, taskName);
             }
-            // Kiểm tra và dừng lịch trình nếu nhiệm vụ đã hoàn thành
+            // Hoang Vực đã xong trong ngày: kiểm tra lại sau 00:00 giờ Việt Nam
+            // để TaskTracker reset và tự chạy boss mới mà không cần tải lại trang.
             if (isTaskDone) {
                 loadHH3DProfile().catch(() => { });
+                if (taskName === 'hoangvuc') {
+                    const vnNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+                    const nextVnMidnight = new Date(vnNow);
+                    nextVnMidnight.setHours(24, 0, 5, 0);
+                    const waitUntilReset = Math.max(1000, nextVnMidnight.getTime() - vnNow.getTime());
+                    console.log(`[Auto] Hoang Vực đã hoàn thành hôm nay; sẽ tự kiểm tra lại sau ${Math.ceil(waitUntilReset / 60000)} phút khi sang ngày mới.`);
+                    countdownTimer.set(taskName, waitUntilReset);
+                    this.timeoutIds[taskName] = setTimeout(() => {
+                        taskTracker.getAccountData(this.accountId);
+                        this.scheduleTask(taskName, taskAction, interval);
+                    }, waitUntilReset);
+                }
                 return;
             }
 

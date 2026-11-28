@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.39
+// @name          HH3D Auto - v2.4.40
 // @namespace     hh3d-tool
-// @version       2.4.39
+// @version       2.4.40
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5600,12 +5600,14 @@
                 adminAjaxUrl: this.hvString(hv2?.adminAjax) || this.hvLiteral(currentBossText, ['adminAjaxUrl']),
                 serverTimeMs: Number(hv2?.serverMs) > 0 ? Number(hv2.serverMs) : this.hvNumberLiteral(currentBossText, ['serverTimeMs', 'server_time_ms']),
                 remainingAttacks: Number.isInteger(hv2Attacks) ? hv2Attacks : (count ? Number(count[0]) : null),
-                // Nhận diện trạng thái trực tiếp trên giao diện Hoang Vực.
-                bossSealed: /(?:boss|thủ lĩnh)[^.!?]{0,80}(?:bị\s*)?phong\s*ấn|(?:bị\s*)?phong\s*ấn[^.!?]{0,80}(?:boss|thủ lĩnh)/i.test(doc.body?.textContent || ''),
-                // Khi boss bị kết liễu, trang hiện nút "NHẬN THƯỞNG"; ưu tiên dấu hiệu UI này
-                // vì dữ liệu HV2 không luôn cung cấp has_pending_rewards.
-                hasPendingRewards: /NHẬN\s*THƯỞNG/i.test(doc.body?.textContent || ''),
-                bossDefeatedOnPage: /Thần\s*Thú\s*đã\s*kết\s*liễu/i.test(doc.body?.textContent || ''),
+                // HV2 cung cấp trạng thái thưởng trực tiếp qua pending và data-state.
+                // Không chỉ dò chữ trên body vì nút nhận thưởng có thể được JavaScript render sau khi tải trang.
+                bossSealed: hv2?.sealed === true || /(?:boss|thủ lĩnh)[^.!?]{0,80}(?:bị\s*)?phong\s*ấn|(?:bị\s*)?phong\s*ấn[^.!?]{0,80}(?:boss|thủ lĩnh)/i.test(doc.body?.textContent || ''),
+                hasPendingRewards: hv2?.pending === true || doc.querySelector('#hv2[data-state="claim"]') !== null
+                    || /NHẬN\s*THƯỞNG/i.test(doc.body?.textContent || ''),
+                bossDefeatedOnPage: Number(hv2?.boss?.health) <= 0
+                    || hv2?.pending === true
+                    || /Thần\s*Thú\s*đã\s*kết\s*liễu/i.test(doc.body?.textContent || ''),
                 myElement: this.hvString(hv2?.user?.element) || (element ? element[1].toLowerCase() : null),
                 loadedAt: Date.now()
             };
@@ -5632,6 +5634,9 @@
                     const attacks = Number(hv2.user?.attacks);
                     if (Number.isInteger(attacks) && attacks >= 0) data.remainingAttacks = attacks;
                     if (this.hvString(hv2.user?.element)) data.myElement = hv2.user.element;
+                    data.bossSealed = hv2.sealed === true || data.bossSealed;
+                    data.hasPendingRewards = hv2.pending === true || data.hasPendingRewards;
+                    data.bossDefeatedOnPage = Number(hv2.boss?.health) <= 0 || hv2.pending === true || data.bossDefeatedOnPage;
                     data.act.bossAttack = '3bcf73de';
                     data.act.bossTimer = 'a899b69f';
                 }

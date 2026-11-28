@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.27
+// @name          HH3D Auto - v2.4.28
 // @namespace     hh3d-tool
-// @version       2.4.27
+// @version       2.4.28
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5952,11 +5952,6 @@
             const remainingAttacks = context.remainingAttacks;
             const nonce = context.nonce;
 
-            if (remainingAttacks === 0) {
-                taskTracker.markTaskDone(accountId, 'hoangvuc');
-                return true;
-            }
-
             let boss;
             if (context.hv2 && context.boss && context.boss.id != null) {
                 boss = {
@@ -5981,6 +5976,17 @@
             if (_rewardReload && boss.has_pending_rewards) {
                 throw new Error('Hoang Vực: nhận thưởng chưa hoàn tất, đã dừng để tránh lặp yêu cầu.');
             }
+            const bossDefeated = boss.defeated_time !== null || parseInt(boss.health, 10) === 0;
+            // HV2 không trả has_pending_rewards như API cũ. Khi boss đã chết,
+            // vẫn phải gọi claim_chest giống thao tác nhận thưởng thủ công trên website.
+            if (context.hv2 && bossDefeated) {
+                const claimed = await this.claimHoangVucRewards(nonce);
+                if (!claimed) {
+                    throw new Error('Hoang Vực: boss đã chết nhưng máy chủ chưa xác nhận nhận thưởng. Đã dừng để tránh gửi lặp.');
+                }
+                taskTracker.markTaskDone(accountId, 'hoangvuc');
+                return true;
+            }
             if (boss.has_pending_rewards) {
                 const claimed = await this.claimHoangVucRewards(nonce);
                 if (!claimed) {
@@ -5990,7 +5996,11 @@
                 this._hvContext = null;
                 return this.doHoangVucOnce(true);
             }
-            if (boss.defeated_time !== null || parseInt(boss.health, 10) === 0) {
+            if (bossDefeated) {
+                taskTracker.markTaskDone(accountId, 'hoangvuc');
+                return true;
+            }
+            if (remainingAttacks === 0) {
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }

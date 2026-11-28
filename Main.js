@@ -2074,6 +2074,18 @@
                             progressText += ` (${window.bicanhBossHp.toFixed(2)}% HP)`;
                         }
                         progressSpan.textContent = progressText;
+                        // Lưu lại số hiện đang hiển thị ở dòng Khoáng Mạch (ví dụ 600/600)
+                        // để chế độ nhận thưởng 90% dùng đúng dữ liệu đã đọc cho UI.
+                        if (item.dataset.taskId === 'khoangmach') {
+                            const dailyMatch = progressText.match(/(\d[\d,.]*)\s*\/\s*(\d[\d,.]*)/);
+                            if (dailyMatch) {
+                                const current = Number(dailyMatch[1].replace(/[,.]/g, ''));
+                                const limit = Number(dailyMatch[2].replace(/[,.]/g, ''));
+                                if (Number.isFinite(current) && Number.isFinite(limit) && limit > 0) {
+                                    window.__hh3dDailyTuViProgress = { current, limit, updatedAt: Date.now() };
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -7456,34 +7468,21 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // Đọc tiến độ Tu Vi/ngày trực tiếp từ trang Nhiệm Vụ Hằng Ngày.
-        // Trả về null nếu không đọc được để chế độ 90% không nhận thưởng khi thiếu dữ liệu.
+        // Dùng chung tiến độ Khoáng Mạch đã được bộ cập nhật nhiệm vụ đọc và hiển thị trên tool.
+        // Không tải lại trang Nhiệm Vụ Hằng Ngày lần thứ hai.
         async getDailyTuViProgress() {
-            try {
-                const url = new URL('nhiem-vu-hang-ngay', weburl).toString();
-                const response = await fetch(url, {
-                    method: 'GET',
-                    credentials: 'include',
-                    cache: 'no-store',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const html = await response.text();
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                const pageText = (doc.body?.innerText || doc.body?.textContent || html)
-                    .replace(/\s+/g, ' ');
-                const match = pageText.match(/Tu\s*Vi\s*[:：]?\s*(\d[\d,.]*)\s*\/\s*(\d[\d,.]*)/i);
-                if (!match) throw new Error('Không tìm thấy chỉ số Tu Vi/ngày dạng hiện tại/tối đa');
-                const current = Number(match[1].replace(/[,.]/g, ''));
-                const limit = Number(match[2].replace(/[,.]/g, ''));
-                if (!Number.isFinite(current) || !Number.isFinite(limit) || limit <= 0) {
-                    throw new Error('Dữ liệu Tu Vi/ngày không hợp lệ');
-                }
-                return { current, limit };
-            } catch (error) {
-                console.warn(`${this.logPrefix} Không đọc được Tu Vi/ngày:`, error);
+            const progress = window.__hh3dDailyTuViProgress;
+            if (!progress) {
+                console.warn(`${this.logPrefix} Chưa có dữ liệu tiến độ Khoáng Mạch từ giao diện nhiệm vụ.`);
                 return null;
             }
+            const current = Number(progress.current);
+            const limit = Number(progress.limit);
+            if (!Number.isFinite(current) || !Number.isFinite(limit) || limit <= 0) {
+                console.warn(`${this.logPrefix} Dữ liệu tiến độ Khoáng Mạch không hợp lệ:`, progress);
+                return null;
+            }
+            return { current, limit };
         }
 
         async #getNonce(actionName) {

@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.29
+// @name          HH3D Auto - v2.4.30
 // @namespace     hh3d-tool
-// @version       2.4.29
+// @version       2.4.30
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5781,7 +5781,9 @@
             if (!liveNonce) throw new Error('Hoang Vực: không tìm thấy nonce để nhận thưởng; chưa gửi yêu cầu.');
             const payload = new URLSearchParams({ action, nonce: liveNonce });
             console.log(`${this.logPrefix} 🎁 Đang nhận thưởng...`);
-            const response = await fetch(this.adminAjaxUrl, {
+            // HAR nhận thưởng thủ công xác nhận endpoint đúng là hh3d-ajax.php,
+            // không phải wp-admin/admin-ajax.php.
+            const response = await fetch(this.ajaxUrl, {
                 method: 'POST', headers: this.headers, body: payload, credentials: 'include', cache: 'no-store'
             });
             const responseText = await response.text();
@@ -5794,7 +5796,10 @@
             if (!response.ok) {
                 throw new Error(`Hoang Vực: API nhận thưởng lỗi HTTP ${response.status}: ${this.hvApiError(data)}`);
             }
-            if (data.success) {
+            // API thực tế trả success là chuỗi thông báo, không phải boolean true.
+            const claimSucceeded = data.success === true
+                || (typeof data.success === 'string' && /đã được nhận|nhận thưởng thành công/i.test(data.success));
+            if (claimSucceeded) {
                 const rewards = data.total_rewards || data.data?.total_rewards || {};
                 const message = `✅ Nhận thưởng thành công: +${rewards.tinh_thach ?? 0} Tinh Thạch, +${rewards.tu_vi ?? 0} Tu Vi.`;
                 console.log(message);

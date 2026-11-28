@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.37
+// @name          HH3D Auto - v2.4.38
 // @namespace     hh3d-tool
-// @version       2.4.37
+// @version       2.4.38
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5564,8 +5564,12 @@
                 adminAjaxUrl: this.hvString(hv2?.adminAjax) || this.hvLiteral(currentBossText, ['adminAjaxUrl']),
                 serverTimeMs: Number(hv2?.serverMs) > 0 ? Number(hv2.serverMs) : this.hvNumberLiteral(currentBossText, ['serverTimeMs', 'server_time_ms']),
                 remainingAttacks: Number.isInteger(hv2Attacks) ? hv2Attacks : (count ? Number(count[0]) : null),
-                // Nhận diện trạng thái boss bị phong ấn từ nội dung trang do máy chủ trả về.
+                // Nhận diện trạng thái trực tiếp trên giao diện Hoang Vực.
                 bossSealed: /(?:boss|thủ lĩnh)[^.!?]{0,80}(?:bị\s*)?phong\s*ấn|(?:bị\s*)?phong\s*ấn[^.!?]{0,80}(?:boss|thủ lĩnh)/i.test(doc.body?.textContent || ''),
+                // Khi boss bị kết liễu, trang hiện nút "NHẬN THƯỞNG"; ưu tiên dấu hiệu UI này
+                // vì dữ liệu HV2 không luôn cung cấp has_pending_rewards.
+                hasPendingRewards: /NHẬN\s*THƯỞNG/i.test(doc.body?.textContent || ''),
+                bossDefeatedOnPage: /Thần\s*Thú\s*đã\s*kết\s*liễu/i.test(doc.body?.textContent || ''),
                 myElement: this.hvString(hv2?.user?.element) || (element ? element[1].toLowerCase() : null),
                 loadedAt: Date.now()
             };
@@ -5962,10 +5966,6 @@
             const remainingAttacks = context.remainingAttacks;
             const nonce = context.nonce;
 
-            if (!Number.isInteger(remainingAttacks) || remainingAttacks < 0) {
-                throw new Error('Hoang Vực: không đọc được số lượt đánh từ trang; tạm dừng, không tự đánh.');
-            }
-
             let boss;
             if (context.hv2 && context.boss && context.boss.id != null) {
                 boss = {
@@ -5973,7 +5973,7 @@
                     element: context.boss.element,
                     health: context.boss.health,
                     defeated_time: Number(context.boss.health) <= 0 ? 0 : null,
-                    has_pending_rewards: false
+                    has_pending_rewards: context.hasPendingRewards === true
                 };
             } else {
                 const payloadBossInfo = new URLSearchParams({
@@ -5992,7 +5992,8 @@
             }
             const defeatedTime = boss.defeated_time;
             const hasDefeatedTime = defeatedTime !== null && defeatedTime !== undefined && defeatedTime !== '' && Number(defeatedTime) > 0;
-            const bossDefeated = hasDefeatedTime || Number(boss.health) <= 0;
+            const bossDefeated = hasDefeatedTime || Number(boss.health) <= 0
+                || context.bossDefeatedOnPage === true || context.hasPendingRewards === true;
             // Boss chết là điều kiện nhận thưởng ở cả HV2 và API cũ.
             // Không được chỉ dựa vào context.hv2, nếu không nhánh API cũ sẽ đánh dấu xanh mà bỏ qua rương.
             if (bossDefeated) {
@@ -6035,6 +6036,10 @@
             if (bossDefeated) {
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
+            }
+            // Đọc và xử lý phần thưởng trước; chỉ yêu cầu số lượt khi thực sự cần đánh.
+            if (!Number.isInteger(remainingAttacks) || remainingAttacks < 0) {
+                throw new Error('Hoang Vực: không đọc được số lượt đánh từ trang; đã kiểm tra trạng thái thưởng/boss và tạm dừng, không tự đánh.');
             }
             if (remainingAttacks === 0) {
                 // Không đánh dấu hoàn thành: boss có thể bị người khác hạ sau nhiều giờ.

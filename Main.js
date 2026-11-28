@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.38
+// @name          HH3D Auto - v2.4.39
 // @namespace     hh3d-tool
-// @version       2.4.38
+// @version       2.4.39
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -4806,10 +4806,15 @@
         };
 
         try {
+            console.log(`${logPrefix} ⏲️ Đang kiểm tra thưởng mốc tích lũy tháng...`);
+            await phucloiclaimbonus();
+
             console.log(`${logPrefix} ⏲️ Đang lấy thời gian trực tiếp từ máy chủ...`);
             let state = await fetchPlServerState();
 
             if (state.chestLevel >= 4) {
+                // Vẫn kiểm tra thưởng mốc lần nữa trước khi kết thúc nhiệm vụ ngày.
+                await phucloiclaimbonus();
                 showNotification('Phúc Lợi Đường đã hoàn tất hôm nay!', 'success');
                 taskTracker.markTaskDone(accountId, 'phucloi');
                 return;
@@ -4856,6 +4861,8 @@
             // Luôn đọc lại bộ đếm do website trả về sau khi mở rương thành công.
             await new Promise(resolve => setTimeout(resolve, 350));
             state = await fetchPlServerState();
+            // Mở rương có thể vừa làm đủ điểm một mốc tháng; đọc pending mới nhất và nhận ngay.
+            await phucloiclaimbonus();
             if (state.chestLevel >= 4 || message.includes('đã hoàn thành Phúc Lợi ngày hôm nay')) {
                 taskTracker.markTaskDone(accountId, 'phucloi');
                 showNotification('Phúc Lợi Đường đã hoàn tất hôm nay!', 'success');
@@ -4909,12 +4916,39 @@
             return;
         }
 
-        // Bước 2: Thử chest_id từ 1 đến 4
-        for (let chestId = 1; chestId <= 4; chestId++) {
+        // Đọc danh sách mốc đang chờ nhận từ plConfig do máy chủ nhúng trong HTML.
+        // Chỉ gọi claim cho các mốc pending; không thử lần lượt cả 4 mốc đã nhận/chưa đủ điểm.
+        let pendingMilestones = [];
+        try {
+            const pageResp = await fetch(weburl + "phuc-loi-duong?t", {
+                credentials: "include",
+                cache: "no-store"
+            });
+            const pageHtml = await pageResp.text();
+            const configMatch = pageHtml.match(/window\\.plConfig\\s*=\\s*(\\{[\\s\\S]*?\\});/);
+            if (configMatch?.[1]) {
+                const plConfig = JSON.parse(configMatch[1]);
+                pendingMilestones = Array.isArray(plConfig.pending) ? plConfig.pending : [];
+            }
+        } catch (err) {
+            console.error(`${logPrefix} ❌ Không đọc được danh sách mốc đang chờ:`, err);
+            return;
+        }
+
+        if (!pendingMilestones.length) {
+            console.log(`${logPrefix} ℹ️ Không có mốc tích lũy tháng nào đang chờ nhận.`);
+            return;
+        }
+
+        console.log(`${logPrefix} 🎁 Có ${pendingMilestones.length} mốc đang chờ:`, pendingMilestones);
+        for (const milestone of pendingMilestones) {
+            const milestoneId = Number(milestone?.id);
+            if (!Number.isInteger(milestoneId) || milestoneId < 1) continue;
+
             const payload = new URLSearchParams();
             payload.append("action", "claim_bonus_reward");
             payload.append("security_token", securityToken);
-            payload.append("chest_id", chestId);
+            payload.append("chest_id", String(milestoneId));
 
             try {
                 const response = await fetch(ajaxUrl, {
@@ -4925,19 +4959,21 @@
                         "X-Requested-With": "XMLHttpRequest"
                     },
                     body: payload,
-                    credentials: "include"
+                    credentials: "include",
+                    cache: "no-store"
                 });
 
                 const data = await response.json();
-                // console.log(`${logPrefix} Chest ${chestId}:`, data);
-
-                if (data.success) {
-                    showNotification(`${logPrefix} ✅ Chest ${chestId}: ${data.data?.message}`, "success");
+                if (data?.success) {
+                    showNotification(`${logPrefix} ✅ Đã nhận mốc ${milestoneId}: ${data.data?.message || milestone.label || "Thành công"}`, "success");
                 } else {
-                    showNotification(`${logPrefix} ⚠️ Chest ${chestId}: ${data.data?.message}`, "warn");
+                    const message = data?.data?.message || "Máy chủ chưa xác nhận nhận thưởng.";
+                    console.warn(`${logPrefix} ⚠️ Mốc ${milestoneId} chưa nhận được:`, data);
+                    showNotification(`${logPrefix} ⚠️ Mốc ${milestoneId}: ${message}`, "warn");
                 }
             } catch (err) {
-                showNotification(`${logPrefix} ❌ Lỗi khi gọi chest ${chestId}: ${err}`, "error");
+                console.error(`${logPrefix} ❌ Lỗi khi nhận mốc ${milestoneId}:`, err);
+                showNotification(`${logPrefix} ❌ Lỗi mốc ${milestoneId}: ${err.message || err}`, "error");
             }
         }
     }

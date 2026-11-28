@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.34
+// @name          HH3D Auto - v2.4.35
 // @namespace     hh3d-tool
-// @version       2.4.34
+// @version       2.4.35
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5993,27 +5993,28 @@
             if (_rewardReload && boss.has_pending_rewards) {
                 throw new Error('Hoang Vực: nhận thưởng chưa hoàn tất, đã dừng để tránh lặp yêu cầu.');
             }
-            const bossDefeated = boss.defeated_time !== null || parseInt(boss.health, 10) === 0;
-            // HV2 không trả has_pending_rewards như API cũ. Khi boss đã chết,
-            // vẫn phải gọi claim_chest giống thao tác nhận thưởng thủ công trên website.
-            if (context.hv2 && bossDefeated) {
+            const defeatedTime = boss.defeated_time;
+            const hasDefeatedTime = defeatedTime !== null && defeatedTime !== undefined && defeatedTime !== '' && Number(defeatedTime) > 0;
+            const bossDefeated = hasDefeatedTime || Number(boss.health) <= 0;
+            // Boss chết là điều kiện nhận thưởng ở cả HV2 và API cũ.
+            // Không được chỉ dựa vào context.hv2, nếu không nhánh API cũ sẽ đánh dấu xanh mà bỏ qua rương.
+            if (bossDefeated) {
                 const oldBossId = boss.id;
                 const claimed = await this.claimHoangVucRewards(nonce);
                 if (!claimed) {
-                    throw new Error('Hoang Vực: boss đã chết nhưng máy chủ chưa xác nhận nhận thưởng. Đã dừng để tránh gửi lặp.');
+                    throw new Error('Hoang Vực: boss đã chết nhưng máy chủ chưa xác nhận nhận thưởng. Nhiệm vụ chưa được đánh dấu hoàn thành.');
                 }
-                // Sau khi nhận thưởng, hỏi lại máy chủ. Nếu đã sang ngày và boss mới mở,
-                // tiếp tục đánh ngay; nếu boss vẫn chết/bị phong ấn thì chờ ngày tiếp theo.
+                // Sau khi nhận thưởng, tải lại trạng thái từ máy chủ.
                 this._hvContext = null;
                 const refreshed = await this.getHoangVucData(weburl + 'hoang-vuc', true);
                 const refreshedBoss = refreshed.hv2?.boss || refreshed.boss;
                 const refreshedBossAlive = refreshedBoss && refreshedBoss.id != null && Number(refreshedBoss.health) > 0;
                 if (refreshedBossAlive) {
-                    console.log(`${this.logPrefix} 🐉 Đã nhận thưởng; máy chủ đang có boss ${refreshedBoss.id} (boss trước: ${oldBossId}). Tiếp tục tự đánh.`);
+                    console.log(`${this.logPrefix} 🐉 Đã nhận thưởng; máy chủ có boss ${refreshedBoss.id} (boss trước: ${oldBossId}). Tiếp tục tự đánh.`);
                     taskTracker.unmarkTaskDone(accountId, 'hoangvuc');
                     return this.doHoangVucOnce(true);
                 }
-                console.log(`${this.logPrefix} 🔒 Đã nhận thưởng; boss mới vẫn chưa mở, chờ ngày tiếp theo.`);
+                console.log(`${this.logPrefix} 🔒 Đã nhận thưởng; boss mới chưa mở hoặc vẫn bị phong ấn. Dừng Hoang Vực hôm nay.`);
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }

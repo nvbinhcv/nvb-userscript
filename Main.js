@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.25
+// @name          HH3D Auto - v2.4.26
 // @namespace     hh3d-tool
-// @version       2.4.25
+// @version       2.4.26
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -11181,6 +11181,79 @@
                     border-color: #667eea;
                     color: #fff;
                 }
+
+                /* ===== Bright colorful HH3D Auto theme v2.4.26 ===== */
+                .custom-script-menu {
+                    background: linear-gradient(145deg, #f4f9ff 0%, #eaf3ff 55%, #f4f0ff 100%) !important;
+                    color: #24324a !important;
+                    border: 1px solid #b9d4f5 !important;
+                    border-radius: 12px !important;
+                    box-shadow: 0 12px 32px rgba(30, 75, 130, .22) !important;
+                }
+                .custom-script-menu #autoProfileInfo,
+                .custom-script-menu .nv-quest-details,
+                .custom-script-menu .nv-quest-item {
+                    color: #26364d !important;
+                }
+                .custom-script-menu .nv-quest-item {
+                    background: rgba(255,255,255,.88) !important;
+                    border: 1px solid #d5e5f8 !important;
+                    border-radius: 9px !important;
+                    box-shadow: 0 2px 6px rgba(54,104,160,.08);
+                    margin: 4px 0 !important;
+                }
+                .custom-script-menu .nv-quest-name,
+                .custom-script-menu .quest-progress {
+                    color: #26364d !important;
+                }
+                .custom-script-menu button,
+                .custom-script-menu .quest-action-btn,
+                .custom-script-menu .quest-extra-btn,
+                .custom-script-menu .quest-settings-btn,
+                .custom-script-menu .general-link-btn,
+                .custom-script-menu .settings-save-btn,
+                .custom-script-menu .autorun-main-btn {
+                    border: 0 !important;
+                    border-radius: 7px !important;
+                    color: #fff !important;
+                    font-weight: 700 !important;
+                    text-shadow: 0 1px 1px rgba(0,0,0,.12);
+                    box-shadow: 0 2px 5px rgba(31,65,110,.16);
+                    transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+                }
+                .custom-script-menu button:hover,
+                .custom-script-menu .quest-action-btn:hover,
+                .custom-script-menu .quest-extra-btn:hover,
+                .custom-script-menu .general-link-btn:hover {
+                    filter: brightness(1.08) saturate(1.12) !important;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 9px rgba(31,65,110,.22);
+                }
+                .custom-script-menu .quest-action-btn { background: linear-gradient(135deg,#16a085,#0f9b78) !important; }
+                .custom-script-menu .quest-extra-btn { background: linear-gradient(135deg,#3b82f6,#2563eb) !important; }
+                .custom-script-menu .quest-settings-btn,
+                .custom-script-menu #settings-btn,
+                .custom-script-menu #guide-btn { background: linear-gradient(135deg,#8b5cf6,#6d28d9) !important; }
+                .custom-script-menu .general-link-btn { background: linear-gradient(135deg,#0ea5e9,#0284c7) !important; }
+                .custom-script-menu .settings-save-btn { background: linear-gradient(135deg,#10b981,#059669) !important; }
+                .custom-script-menu .quest-toggle { background: linear-gradient(135deg,#f59e0b,#d97706) !important; }
+                .custom-script-menu .quest-select,
+                .custom-script-menu .quest-input,
+                .custom-script-menu select,
+                .custom-script-menu input {
+                    background: #fff !important;
+                    color: #26364d !important;
+                    border: 1px solid #b9d2ef !important;
+                    border-radius: 6px !important;
+                }
+                .custom-script-menu .custom-script-status-bar {
+                    background: rgba(255,255,255,.8) !important;
+                    border-color: #d5e5f8 !important;
+                    color: #26364d !important;
+                }
+                .custom-script-menu .quest-autorun-indicator.enabled { background: #22c55e !important; }
+                .custom-script-menu .quest-autorun-indicator.disabled { background: #cbd5e1 !important; }
+                /* ===== End bright theme ===== */
 
                 /* Search task item */
                 .nv-quest-item.km-search-item {

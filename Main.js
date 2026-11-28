@@ -452,44 +452,9 @@
                             return;
                         }
                         finishingFull = true;
-                        say('Huyền Tinh đã full; đang gọi API rời phòng...');
-                        for (let attempt = 1; attempt <= 5 && !reported; attempt++) {
-                            try {
-                                let headers = await getMazeAuthHeaders();
-                                if (!headers) {
-                                    await refreshMazeAuth();
-                                    headers = await getMazeAuthHeaders();
-                                }
-                                if (!headers) throw new Error('Không lấy được token xác thực hiện tại.');
-                                let leaveResponse = await window.fetch((getWpConfig()?.restBase || '/wp-json/me-cung/v1') + '/leave', {
-                                    method:'POST', credentials:'include', cache:'no-store', headers,
-                                    body:JSON.stringify({room_code:mazeRoomCode})
-                                });
-                                let leaveData = await leaveResponse.json().catch(() => ({}));
-                                if (leaveResponse.status === 401 || leaveResponse.status === 403) {
-                                    await refreshMazeAuth();
-                                    headers = await getMazeAuthHeaders();
-                                    if (headers) {
-                                        leaveResponse = await window.fetch((getWpConfig()?.restBase || '/wp-json/me-cung/v1') + '/leave', {
-                                            method:'POST', credentials:'include', cache:'no-store', headers,
-                                            body:JSON.stringify({room_code:mazeRoomCode})
-                                        });
-                                        leaveData = await leaveResponse.json().catch(() => ({}));
-                                    }
-                                }
-                                if (!leaveResponse.ok || !leaveData.success) throw new Error(leaveData.message || leaveData.data?.message || `HTTP ${leaveResponse.status}`);
-                                say('API rời phòng thành công. Báo Manager kết thúc phiên và chuyển tài khoản.');
-                                await sendOut(`Đã nhận rương ải 5; Huyền Tinh/ngày ${total}/${cap}; API rời phòng thành công.`, total, 'daily_full');
-                                break;
-                            } catch (error) {
-                                console.warn(prefix, `Rời phòng thất bại (lần ${attempt}/5):`, error);
-                                if (attempt < 5) await wait(3000);
-                            }
-                        }
-                        if (!reported) {
-                            finishingFull = false;
-                            say('Chưa rời được phòng; giữ nguyên Chrome và tiếp tục chờ, không chuyển tài khoản.');
-                        }
+                        // Chỉ báo Manager đã đủ Huyền Tinh/ngày; tuyệt đối không tự gọi API /leave.
+                        say('Huyền Tinh đã full; giữ nguyên trong phòng, không tự động rời phòng.');
+                        await sendOut(`Đã nhận rương ải 5; Huyền Tinh/ngày ${total}/${cap}; giữ nguyên trong phòng, không tự động rời.`, total, 'daily_full');
                     };
                     // Theo dõi vòng đời phòng: nếu đầu hàng/thất bại và API Lobby xác nhận
                     // UID đã về sảnh (không còn trong phòng), tham gia lại bằng invite cũ.

@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.35
+// @name          HH3D Auto - v2.4.36
 // @namespace     hh3d-tool
-// @version       2.4.35
+// @version       2.4.36
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -6076,7 +6076,9 @@
                     await new Promise(resolve => setTimeout(resolve, 350));
                     const refreshedNextTime = await this.hvFetchNextAttackTime();
                     taskTracker.adjustTaskTime(accountId, 'hoangvuc', refreshedNextTime);
-                    console.log(`${this.logPrefix} 🕒 Website trả thời điểm đánh tiếp: ${new Date(refreshedNextTime).toLocaleTimeString('vi-VN')}`);
+                    const cooldownMs = Math.max(1000, refreshedNextTime - Date.now());
+                    countdownTimer.set('hoangvuc', cooldownMs);
+                    console.log(`${this.logPrefix} 🕒 Website trả thời điểm đánh tiếp: ${new Date(refreshedNextTime).toLocaleTimeString('vi-VN')} (còn ${Math.ceil(cooldownMs / 1000)} giây). Đã cập nhật đồng hồ panel.`);
                     return true;
                 }
                 return false;
@@ -6088,6 +6090,8 @@
             const seconds = remainingSeconds % 60;
             showNotification(`⏳ Cần chờ <b>${minutes} phút ${seconds} giây</b> để tấn công tiếp.`, 'info');
             taskTracker.adjustTaskTime(accountId, 'hoangvuc', nextTime);
+            countdownTimer.set('hoangvuc', remainingTime);
+            console.log(`${this.logPrefix} ⏳ Đã cập nhật đồng hồ panel Hoang Vực: ${minutes} phút ${seconds} giây.`);
             return true;
         }
 

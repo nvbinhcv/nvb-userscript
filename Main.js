@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.31
+// @name          HH3D Auto - v2.4.32
 // @namespace     hh3d-tool
-// @version       2.4.31
+// @version       2.4.32
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5781,9 +5781,8 @@
             if (!liveNonce) throw new Error('Hoang Vực: không tìm thấy nonce để nhận thưởng; chưa gửi yêu cầu.');
             const payload = new URLSearchParams({ action, nonce: liveNonce });
             console.log(`${this.logPrefix} 🎁 Đang nhận thưởng...`);
-            // HAR nhận thưởng thủ công xác nhận endpoint đúng là hh3d-ajax.php,
-            // không phải wp-admin/admin-ajax.php.
-            const response = await fetch(this.ajaxUrl, {
+            // HAR nhận thưởng thủ công xác nhận endpoint là wp-admin/admin-ajax.php.
+            const response = await fetch(this.adminAjaxUrl, {
                 method: 'POST', headers: this.headers, body: payload, credentials: 'include', cache: 'no-store'
             });
             const responseText = await response.text();

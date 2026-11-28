@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name          HH3D Auto - v2.4.36
+// @name          HH3D Auto - v2.4.37
 // @namespace     hh3d-tool
-// @version       2.4.36
+// @version       2.4.37
 // @updateURL     https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @downloadURL   https://raw.githubusercontent.com/nvbinhcv/nvb-userscript/main/Main.js
 // @description   HH3D Auto with local Multi Account Manager group commands
@@ -5879,8 +5879,11 @@
                             const message = this.hvApiError(result);
                             if (/hết lượt tấn công trong ngày/i.test(message)) {
                                 this.hvUpdateAttackResult({ remaining_attacks: 0 });
-                                taskTracker.markTaskDone(accountId, 'hoangvuc');
-                                showNotification(message, 'info');
+                                const nextCheck = Date.now() + 15 * 60 * 1000;
+                                taskTracker.unmarkTaskDone(accountId, 'hoangvuc');
+                                taskTracker.adjustTaskTime(accountId, 'hoangvuc', nextCheck);
+                                countdownTimer.set('hoangvuc', 15 * 60 * 1000);
+                                showNotification(message + ' Tool sẽ kiểm tra lại Hoang Vực sau 15 phút để phát hiện rương thưởng.', 'info');
                                 return true;
                             }
                             throw new Error(message);
@@ -5959,12 +5962,6 @@
             const remainingAttacks = context.remainingAttacks;
             const nonce = context.nonce;
 
-            // Boss bị phong ấn: dừng Hoang Vực trong ngày, không gọi API đánh boss.
-            if (context.bossSealed || context.hv2?.boss?.sealed === true || context.hv2?.boss?.status === 'sealed') {
-                console.log(`${this.logPrefix} 🔒 Boss đang bị phong ấn. Dừng Hoang Vực hôm nay, không tấn công.`);
-                taskTracker.markTaskDone(accountId, 'hoangvuc');
-                return true;
-            }
             if (!Number.isInteger(remainingAttacks) || remainingAttacks < 0) {
                 throw new Error('Hoang Vực: không đọc được số lượt đánh từ trang; tạm dừng, không tự đánh.');
             }
@@ -6027,15 +6024,26 @@
                 this._hvContext = null;
                 return this.doHoangVucOnce(true);
             }
+
+            // Chỉ kết thúc ngày khi đã kiểm tra boss và chắc chắn không còn rương chờ.
+            // Kiểm tra phong ấn SAU khi kiểm tra/nhận thưởng vì boss chết có thể chuyển sang phong ấn.
+            if (context.bossSealed || context.hv2?.boss?.sealed === true || context.hv2?.boss?.status === 'sealed') {
+                console.log(`${this.logPrefix} 🔒 Boss đang phong ấn và không có phần thưởng chờ nhận. Dừng đến ngày mới.`);
+                taskTracker.markTaskDone(accountId, 'hoangvuc');
+                return true;
+            }
             if (bossDefeated) {
                 taskTracker.markTaskDone(accountId, 'hoangvuc');
                 return true;
             }
             if (remainingAttacks === 0) {
-                // Hết lượt khi boss còn sống không phải điều kiện nhận thưởng.
-                // Phần thưởng chỉ được nhận ở nhánh boss đã chết.
-                console.log(`${this.logPrefix} ⏸️ Đã hết 5 lượt đánh nhưng boss vẫn còn sống; không gọi nhận thưởng.`);
-                taskTracker.markTaskDone(accountId, 'hoangvuc');
+                // Không đánh dấu hoàn thành: boss có thể bị người khác hạ sau nhiều giờ.
+                // Tiếp tục kiểm tra định kỳ để tự nhận rương ngay khi boss chết/chuyển phong ấn.
+                const nextCheck = Date.now() + 15 * 60 * 1000;
+                taskTracker.unmarkTaskDone(accountId, 'hoangvuc');
+                taskTracker.adjustTaskTime(accountId, 'hoangvuc', nextCheck);
+                countdownTimer.set('hoangvuc', 15 * 60 * 1000);
+                console.log(`${this.logPrefix} ⏸️ Đã hết 5 lượt, boss còn sống. Giữ nhiệm vụ hoạt động và kiểm tra lại sau 15 phút để không bỏ lỡ rương nếu boss bị hạ.`);
                 return true;
             }
 
@@ -6066,8 +6074,11 @@
                             console.log(`${this.logPrefix} 🎯 Lượt cuối đã hạ boss. Chuyển sang kiểm tra và nhận thưởng.`);
                             return this.doHoangVucOnce(true);
                         }
-                        console.log(`${this.logPrefix} ⏸️ Đã dùng hết lượt đánh hôm nay, boss vẫn còn sống. Dừng Hoang Vực đến ngày mới.`);
-                        taskTracker.markTaskDone(accountId, 'hoangvuc');
+                        const nextCheck = Date.now() + 15 * 60 * 1000;
+                        taskTracker.unmarkTaskDone(accountId, 'hoangvuc');
+                        taskTracker.adjustTaskTime(accountId, 'hoangvuc', nextCheck);
+                        countdownTimer.set('hoangvuc', 15 * 60 * 1000);
+                        console.log(`${this.logPrefix} ⏸️ Đã hết lượt hôm nay, boss còn sống. Không khóa nhiệm vụ; sẽ kiểm tra lại sau 15 phút để tự nhận thưởng nếu boss bị người khác hạ.`);
                         return true;
                     }
 

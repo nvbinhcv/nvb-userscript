@@ -6057,9 +6057,15 @@
                 if (await this.attackHoangVucBoss(boss.id, nonce)) {
                     const latestRemaining = this._hvContext?.remainingAttacks;
                     if (latestRemaining === 0 || (!Number.isInteger(latestRemaining) && remainingAttacks <= 1)) {
-                        // Hết lượt chỉ dừng đánh trong ngày. Không nhận thưởng chỉ vì số lượt về 0;
-                        // phần thưởng chỉ được nhận khi lần kiểm tra trạng thái xác nhận boss đã chết.
-                        console.log(`${this.logPrefix} ⏸️ Đã dùng hết lượt đánh hôm nay. Sẽ kiểm tra trạng thái boss ở lần chạy kế tiếp.`);
+                        // Lượt cuối có thể vừa hạ boss: tải lại trạng thái máy chủ trước khi quyết định dừng.
+                        this._hvContext = null;
+                        const afterLastAttack = await this.getHoangVucData(weburl + 'hoang-vuc', true);
+                        const afterBoss = afterLastAttack.hv2?.boss || afterLastAttack.boss;
+                        if (afterBoss && Number(afterBoss.health) <= 0) {
+                            console.log(`${this.logPrefix} 🎯 Lượt cuối đã hạ boss. Chuyển sang kiểm tra và nhận thưởng.`);
+                            return this.doHoangVucOnce(true);
+                        }
+                        console.log(`${this.logPrefix} ⏸️ Đã dùng hết lượt đánh hôm nay, boss vẫn còn sống. Dừng Hoang Vực đến ngày mới.`);
                         taskTracker.markTaskDone(accountId, 'hoangvuc');
                         return true;
                     }
